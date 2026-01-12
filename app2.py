@@ -11,9 +11,17 @@ class CerebroHibrido(nn.Module):
         super(CerebroHibrido, self).__init__()
         self.fc1 = nn.Linear(1025, 128)
         self.fc2 = nn.Linear(128, 1)
+
     def forward(self, x_quimica, x_biologia):
+        # Aseguramos que ambos tengan la misma dimensión antes de unirlos
+        x_quimica = x_quimica.view(-1) 
+        x_biologia = x_biologia.view(-1)
+        
+        # Unimos: 1024 (química) + 1 (biología) = 1025
         x = torch.cat((x_quimica, x_biologia), dim=0)
-        return torch.sigmoid(self.fc2(torch.relu(self.fc1(x))))
+        
+        x = torch.relu(self.fc1(x))
+        return torch.sigmoid(self.fc2(x))
 
 def smiles_to_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
@@ -65,9 +73,11 @@ if st.button("⚡ Calcular Tratamiento Óptimo"):
     resultados = []
     for nombre, smiles in VADEMECUM.items():
         fp = smiles_to_fp(smiles)
-        with torch.no_grad():
-            prob = modelo(fp, biologia).item()
-            resultados.append({"Antibiótico": nombre, "Eficacia Predicha": prob})
+        if fp is not None:
+            with torch.no_grad():
+                # Llamada limpia al modelo
+                prob = modelo(fp, biologia).item()
+                resultados.append({"Antibiótico": nombre, "Eficacia Predicha": prob})
     
     # Crear tabla de resultados
     df = pd.DataFrame(resultados).sort_values(by="Eficacia Predicha", ascending=False)
@@ -79,4 +89,5 @@ if st.button("⚡ Calcular Tratamiento Óptimo"):
     # Mostrar tabla comparativa
     st.table(df.style.format({"Eficacia Predicha": "{:.2%}"}))
     
+
     st.warning("⚠️ **Nota:** Esta es una herramienta experimental basada en IA. Debe ser validada por un microbiólogo clínico.")
